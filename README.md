@@ -1,275 +1,225 @@
-简体中文 | [English](README_en.md)
+# Video Subtitle Remover · Web 版
 
-<div align="center">
-  <img src="design/icon_1024.PNG" alt="VSR Logo" width="128" height="128">
-</div>
-<div align="center">
-<a href="https://trendshift.io/repositories/9120" target="_blank"><img src="https://trendshift.io/api/badge/repositories/9120" alt="YaoFANGUK%2Fvideo-subtitle-remover | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/9120?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-9120" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/9120/daily?language=Python" alt="YaoFANGUK%2Fvideo-subtitle-remover | Trendshift" width="250" height="55"/></a>
-</div>
+基于 [YaoFANGUK/video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover) 的改造分支：
+在原项目（AI 硬字幕 / 水印擦除）基础上，**增加了一套可以直接在浏览器里使用的 Web 界面**，
+并让整个程序能在**没有图形界面的 Linux GPU 服务器**上正常运行。
 
-## 项目简介
+原项目的算法部分（STTN / LaMa / ProPainter / OpenCV 四套重绘模型、PaddleOCR 字幕检测）**完全保留**，
+本分支只改动「怎么用」，不改动「怎么算」。桌面端 GUI（`gui.py`）依然可用。
 
-![License](https://img.shields.io/badge/License-Apache%202-red.svg)
-![python version](https://img.shields.io/badge/Python-3.11+-blue.svg)
-![support os](https://img.shields.io/badge/OS-Windows/macOS/Linux-green.svg)
-[![Docker](https://img.shields.io/badge/Docker-Image-blue?logo=docker)](https://hub.docker.com/r/eritpchy/video-subtitle-remover)
+![Web 界面](design/web-ui.png)
 
-Video-subtitle-remover (VSR) 是一款基于AI技术，将视频中的硬字幕去除的软件。
-主要实现了以下功能：
-- **无损分辨率**将视频中的硬字幕去除，生成去除字幕后的文件
-- 通过超强AI算法模型，对去除字幕文本的区域进行填充（非相邻像素填充与马赛克去除）
-- 提取原视频字幕，可配合：[video-subtitle-extractor (VSE)](https://github.com/YaoFANGUK/video-subtitle-extractor)
-- 支持自定义字幕位置，仅去除定义位置中的字幕（传入位置）
-- 支持全视频自动去除所有文本（不传入位置）
-- 支持多选图片批量去除水印文本
+---
 
-![demo.png](https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.png)
+## 一、这个分支改了什么
 
-**使用说明：**
+| 改动 | 说明 | 涉及文件 |
+|---|---|---|
+| **Web 界面** | 浏览器上传 → 框选 → 处理 → 下载，全流程 | `web/` |
+| **去 Qt 化运行** | 原 `backend/config.py` 依赖 `qfluentwidgets`(PySide6)，服务器上连 import 都失败；现在按环境自动切换实现，算法代码零改动 | `backend/config.py`、`backend/config_qt.py`、`backend/config_headless.py` |
+| **任务队列** | 每个任务独立子进程 + 独立进程组，进度/日志实时回传，随时可取消 | `web/app.py` |
+| **GPU 状态面板** | 型号、利用率、显存、温度、功耗实时展示（`nvidia-smi`） | `web/app.py` |
+| **可视化框选** | 在画面上直接拖框，支持多个区域，坐标自动换算成原分辨率像素 | `web/static/index.html` |
+| **对比播放** | 原片与处理后同帧同步播放，支持「并排」和「滑动分割」两种模式 | `web/static/index.html` |
+| **重新处理** | 已完成/失败的任务可一键载回上次的框选与算法参数，改完再跑 | `web/static/index.html` |
+| **跨平台** | Web 服务在 Windows / Linux / macOS 均可运行（进程创建、进程树终止、ffmpeg 路径按平台处理） | `web/app.py` |
 
-- 有使用问题请加群讨论，QQ群：210150985（已满）、806152575（已满）、816881808（已满）、295894827
-- 直接下载压缩包解压运行，如果不能运行再按照下面的教程，尝试源码安装conda环境运行
+![对比播放](design/web-compare.png)
 
-**下载地址：**<a href="https://github.com/YaoFANGUK/video-subtitle-remover/releases">Release</a>
+---
 
-**预构建包对比说明**：
+## 二、快速开始
 
-|       预构建包名          | Python  | Paddle | Torch | 环境                          | 支持的计算能力范围|
-|---------------|------------|--------------|--------------|-----------------------------|----------|
-| `vsr-windows-cpu.7z`              | 3.12 | 3.0.0 | 2.7.0 | 通用                 | 通用       |
-| `vsr-windows-directml.7z`         | 3.12 | 3.0.0 | 2.4.1 | Windows 非Nvidia显卡 | 通用       |
-| `vsr-windows-nvidia-cuda-11.8.7z` | 3.12 | 3.0.0 | 2.7.0 | CUDA 11.8           | 3.5 – 8.9  |
-| `vsr-windows-nvidia-cuda-12.6.7z` | 3.12 | 3.0.0 | 2.7.0 | CUDA 12.6           | 5.0 – 8.9  |
-| `vsr-windows-nvidia-cuda-12.8.7z` | 3.12 | 3.0.0 | 2.7.0 | CUDA 12.8           | 5.0 – 9.0+ |
+### 方式一：Web 界面（推荐，服务器 / 远程机器）
 
-> NVIDIA官方提供了各GPU型号的计算能力列表，您可以参考链接: [CUDA GPUs](https://developer.nvidia.com/cuda-gpus) 查看你的GPU适合哪个CUDA版本
+```bash
+git clone https://github.com/xaiojie/video-subtitle-remover.git
+cd video-subtitle-remover
 
-**Docker版本：**
-```shell
-  # Nvidia 10 20 30系显卡
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cuda11.8 python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
-
-  # Nvidia 40系显卡
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cuda12.6 python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
-
-  # Nvidia 50系显卡
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cuda12.8 python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
-
-  # AMD / Intel 独显 集显
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-directml python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
-
-  # CPU
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cpu python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
-
-  # 导出视频
-  docker cp vsr:/vsr/test/test_no_sub.mp4 ./
+# 一键装环境 + 注册 systemd（默认 8800 端口）
+bash deploy/install.sh
 ```
 
-**命令行参数：**
-```
-Video Subtitle Remover Command Line Tool
+脚本会建两个独立的 venv（依赖隔离，Web 服务不用等 torch 装完就能起）：
 
-options:
-  -h, --help            show this help message and exit
-  --input INPUT, -i INPUT
-                        Input video file path
-  --output OUTPUT, -o OUTPUT
-                        Output video file path (optional)
-  --subtitle-area-coords YMIN YMAX XMIN XMAX, -c YMIN YMAX XMIN XMAX
-                        Subtitle area coordinates (ymin ymax xmin xmax). Can be specified multiple times for multiple areas.
-  --inpaint-mode {sttn-auto,sttn-det,lama,propainter,opencv}
-                        Inpaint mode, default is sttn-auto
-```
-## 演示
+- `.venv-web` —— 只有 3 个包（fastapi / uvicorn / python-multipart）
+- `.venv` —— 算法环境，torch 需要按显卡手动装，脚本会打印对应命令
 
-- GUI版：
+**torch 按显卡选版本：**
 
-<p style="text-align:center;"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo2.gif" alt="demo2.gif"/></p>
+| 显卡 | CUDA | 安装命令 |
+|---|---|---|
+| RTX 50 系（5070/5080/5090） | 12.8 | `pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128` |
+| RTX 40 系 | 12.6 | `... --index-url https://download.pytorch.org/whl/cu126` |
+| RTX 30/20/10 系 | 11.8 | `... --index-url https://download.pytorch.org/whl/cu118` |
 
-<p style="text-align:center;"><a href="https://b23.tv/guEbl9C"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.gif" alt="demo.gif"/></a></p>
+> 系统依赖：`apt install ffmpeg libgl1 libglib2.0-0 libsm6 libxext6`（ffmpeg 仓库自带三平台二进制，也可用系统自带的）。
 
-## 源码使用说明
+装完访问 `http://<服务器IP>:8800/`。不想用 systemd 就手动起：
 
-
-#### 1. 安装 Python
-
-请确保您已经安装了 Python 3.12+。
-
-- Windows 用户可以前往 [Python 官网](https://www.python.org/downloads/windows/) 下载并安装 Python。
-- MacOS 用户可以使用 Homebrew 安装：
-  ```shell
-  brew install python@3.12
-  ```
-- Linux 用户可以使用包管理器安装，例如 Ubuntu/Debian：
-  ```shell
-  sudo apt update && sudo apt install python3.12 python3.12-venv python3.12-dev
-  ```
-
-#### 2. 安装依赖文件
-
-请使用虚拟环境来管理项目依赖，避免与系统环境冲突。
-
-（1）创建虚拟环境并激活
-```shell
-python -m venv videoEnv
+```bash
+VSR_CONFIG_MODE=headless \
+VSR_DATA_DIR=./vsr-data \
+VSR_PYTHON=./.venv/bin/python \
+./.venv-web/bin/python web/serve.py
 ```
 
-- Windows：
-```shell
-videoEnv\\Scripts\\activate
-```
-- MacOS/Linux：
-```shell
-source videoEnv/bin/activate
-```
+常用环境变量：
 
-#### 3. 创建并激活项目目录
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `VSR_PORT` / `VSR_PORTS` | `8800` | `serve.py` 支持同时监听多个端口，如 `8800,8801` |
+| `VSR_DATA_DIR` | `<repo>/vsr-data` | 上传文件、输出、任务状态存放处 |
+| `VSR_PYTHON` | 当前解释器 | 执行算法的 Python（必须是装了 torch 的那个 venv） |
+| `VSR_WORKERS` | `1` | 并发任务数（显存够可以调大） |
+| `VSR_MAX_UPLOAD_MB` | `8192` | 单文件上传上限 |
+| `VSR_FFMPEG` | 自动探测 | 指定 ffmpeg 路径 |
 
-切换到源码所在目录：
-```shell
-cd <源码所在目录>
-```
-> 例如：如果您的源代码放在 D 盘的 tools 文件夹下，并且源代码的文件夹名为 video-subtitle-remover，则输入：
-> ```shell
-> cd D:/tools/video-subtitle-remover-main
-> ```
+### 方式二：桌面 GUI（原版功能）
 
-#### 4. 安装合适的运行环境
-
-本项目支持 CUDA (NVIDIA显卡加速)、CPU (无 GPU)、 DirectML (AMD、Intel等GPU/APU加速) 和 macOS (Apple Silicon) 四种运行模式。
-
-##### (1) CUDA（NVIDIA 显卡用户）
-
-> 请确保您的 NVIDIA 显卡驱动支持所选 CUDA 版本。
-
-- 推荐 CUDA 11.8，对应 cuDNN 8.6.0。
-
-- 安装 CUDA：
-  - Windows：[CUDA 11.8 下载](https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe)
-  - Linux：
-    ```shell
-    wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run
-    sudo sh cuda_11.8.0_520.61.05_linux.run
-    ```
-  - MacOS 不支持 CUDA。
-
-- 安装 cuDNN（CUDA 11.8 对应 cuDNN 8.6.0）：
-  - [Windows cuDNN 8.6.0 下载](https://developer.download.nvidia.cn/compute/redist/cudnn/v8.6.0/local_installers/11.8/cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip)
-  - [Linux cuDNN 8.6.0 下载](https://developer.download.nvidia.cn/compute/redist/cudnn/v8.6.0/local_installers/11.8/cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz)
-  - 安装方法请参考 NVIDIA 官方文档。
-
-- 安装 PaddlePaddle GPU 版本（CUDA 11.8）：
-  ```shell
-  pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
-  ```
-- 安装 Torch GPU 版本（CUDA 11.8）：
-  ```shell
-  pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu118
-  ```
-
-- 安装其他依赖
-  ```shell
-  pip install -r requirements.txt
-  ```
-
-- Linux系统还需要安装
-
-  ```shell
-  # for cuda 12.x
-  pip install onnxruntime-gpu==1.22.0
-  # for cuda 11.x
-  pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
-  ```
-  > 详情见: [Install ONNX Runtime](https://onnxruntime.ai/docs/install/#install-onnx-runtime-gpu-cuda-12x)
-
-##### (2) DirectML（AMD、Intel等GPU/APU加速卡用户）
-
-- 适用于 Windows 设备的 AMD/NVIDIA/Intel GPU。
-- 安装 ONNX Runtime DirectML 版本：
-  ```shell
-  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
-  pip install -r requirements.txt
-  pip install torch_directml==0.2.5.dev240914
-  ```
-##### (3) CPU 运行（无 GPU 加速）
-
-- 适用于没有 GPU 或不希望使用 GPU 的情况。
-  ```shell
-  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
-  pip install torch==2.7.0 torchvision==0.22.0
-  pip install -r requirements.txt
-  ```
-##### (4) macOS 运行 (Apple Silicon)
-- 适用于 macOS (Apple Silicon) 设备
-- macOS (Intel) 请使用CPU, 强行使用GPU只会更慢
-- macOS (Apple Silicon)上字幕检测PP-OCRv4-Server模型精度似乎不太理想, 推荐使用其他模型
-  ```shell
-  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
-  pip install torch==2.7.0 torchvision==0.22.0
-  pip install -r requirements.txt
-  ```
-  > 基于Python3.13版本测试
-#### 4. 运行程序
-
-- 运行图形化界面
-
-```shell
+```bash
+pip install -r requirements.txt
 python gui.py
 ```
 
-- 运行命令行版本(CLI)
+`gui.py` 会强制走 Qt 版配置（`VSR_CONFIG_MODE=qt`），界面与上游一致。
 
-```shell
-python ./backend/main.py
+### 方式三：命令行
+
+```bash
+python backend/main.py -i test/test.mp4 -o out.mp4 --inpaint-mode sttn-auto \
+    -c 641 687 330 950      # 字幕区域：ymin ymax xmin xmax，可重复指定多个
 ```
 
-## 常见问题
-1. 提取速度慢怎么办
+---
 
-修改backend/config.py中的参数，可以大幅度提高去除速度
-```python
-MODE = InpaintMode.STTN  # 设置为STTN算法
-STTN_SKIP_DETECTION = True # 跳过字幕检测，跳过后可能会导致要去除的字幕遗漏或者误伤不需要去除字幕的视频帧
+## 三、Web 界面怎么用
+
+1. **拖入视频** → 自动读取分辨率、时长，并进入框选模式
+2. **在画面上拖框**，把字幕（和水印）框住；可以框多个区域
+   - 竖屏视频点「⤓ 底部区域」可一键框住常见字幕带，再微调
+   - 「📋 复制框选参数」可导出像素/归一化/命令行/JSON 四种格式
+3. **选算法**（见下节），点「开始去字幕」
+4. 进度条实时显示帧数与速度，完成后可**在线预览、对比播放、下载**
+
+任务状态存在 `VSR_DATA_DIR/tasks_state.json`，服务重启后历史任务仍在；
+重启瞬间正在跑的任务会标记为「服务重启，任务已中断」。
+
+---
+
+## 四、算法怎么选（重要）
+
+| 算法 | 原理 | 速度 | 适用 |
+|---|---|---|---|
+| **STTN 智能擦除** (`sttn-auto`) | **不做字幕检测**，把你框的区域整块重绘 | 最快 | 大部分真人视频；也能擦掉抖音号/水印 logo |
+| **STTN 带检测** (`sttn-det`) | OCR 检测文字 → 只擦文字多边形 | 慢（OCR 是瓶颈） | 只想擦字幕、不动其它文字 |
+| **LaMa 单帧** (`lama`) | 大模型单帧修复，逐帧处理 | 慢 | 动画/插画类效果最好，字幕区最无痕 |
+| **ProPainter** (`propainter`) | 视频级修复，利用时序信息 | 最慢、最吃显存 | 运动非常剧烈、其它算法糊成一团时 |
+| **OpenCV** (`opencv`) | 传统 inpaint | 极快 | 纯色背景应急 |
+
+### 框选规则（两者要求**相反**，选错就会「擦不干净」或「误伤画面」）
+
+- **`sttn-auto`：不检测，整框重绘** → 框必须**贴紧**文字，框大了会把画面内容一起抹掉
+- **`lama` / `sttn-det` / `propainter`：先 OCR 再擦** → 框可以宽松，但**必须完整包住整行文字**，
+  框太窄会导致 `No subtitles detected` 直接报错
+
+> 典型事故：字幕横跨 x=110~640，只框了 x=247~464，OCR 只能认出被切断的字，于是「怎么都处理不干净」。
+
+### 显存参考
+
+| 算法 | 显存 | 说明 |
+|---|---|---|
+| STTN / LaMa | 4–8 GB | 12GB 卡足够，4K 建议 ≥16GB |
+| ProPainter 720p | `MAX_LOAD_NUM=80` 需 **25GB**，`=50` 需 **19GB** | 12GB 卡请把 `PROPAINTER_MAX_LOAD_NUM` 降到 20–30 |
+
+调低 `STTN_MAX_LOAD_NUM` / `STTN_NEIGHBOR_STRIDE` / `STTN_REFERENCE_LENGTH` 同样能省显存（效果略降）。
+
+---
+
+## 五、50 系显卡（RTX 5070 等）注意事项
+
+50 系是 Blackwell（`sm_120`），**必须用 CUDA 12.8 及以上的推理库**：
+
+1. **torch 用 cu128 轮子**（`torch==2.7.0+cu128`），否则 `torch.cuda.is_available()` 为 False
+2. **PaddlePaddle 对 `sm_120` 的支持要实测**：官方 GPU 轮子目前主要是 cu118 / cu126，
+   如果 `paddlepaddle-gpu` 在你的卡上跑不起来，字幕检测会退回 CPU——
+   - 影响：`lama` / `sttn-det` / `propainter` 三种模式（都要先 OCR）
+   - 不受影响：`sttn-auto`（跳过检测，纯 GPU 重绘），这也是推荐的默认模式
+3. 12GB 显存跑 720p/1080p 的 STTN 没有压力，ProPainter 需要按上表降 `MAX_LOAD_NUM`
+
+---
+
+## 六、实测性能（供参考）
+
+测试环境：NVIDIA A100-SXM4-80GB，Python 3.10，torch 2.6.0+cu124，PaddleOCR 走 CPU。
+
+| 素材 | 模式 | 耗时 | 备注 |
+|---|---|---|---|
+| 1280×720 / 60s / 1800 帧 | STTN 智能擦除 | **66 秒** | 约 27 帧/秒，纯 GPU |
+| 1280×720 / 60s | LaMa | 581 秒 | 其中 OCR 约 450 秒（CPU 是瓶颈） |
+| 1280×720 / 12s | ProPainter | 151 秒 | 外推 60 秒约 19 分钟 |
+| 852×480 / 21s | LaMa | 165 秒 | 检测 3.7 帧/秒 |
+
+结论：**瓶颈通常不在显卡，而在字幕检测（OCR）**。能用 `sttn-auto` 就用它。
+
+---
+
+## 七、常见问题
+
+**1. 处理卡在 9x% 不动，进程还在但没输出**
+
+视频文件的容器头声明帧数 > 实际可解码帧数时，后端 `FramePrefetcher` 会死锁
+（日志停在 `Failed to read frame N`）。抖音/剪映二次导出的视频常见。先重封装：
+
+```bash
+ffmpeg -i 源.mp4 -c:v libx264 -crf 18 -preset veryfast -c:a copy fixed.mp4
 ```
 
-2. 视频去除效果不好怎么办
+**2. 报 `No subtitles detected`**
 
-修改backend/config.py中的参数，尝试不同的去除算法，算法介绍
+说明用的是带检测的模式，而框选区域里 OCR 没认出文字：把框放宽到能完整包住整行；
+或者改用 `sttn-auto`（不检测）。
 
-> - InpaintMode.STTN 算法：对于真人视频效果较好，速度快，可以跳过字幕检测
-> - InpaintMode.LAMA 算法：对于图片效果最好，对动画类视频效果好，速度一般，不可以跳过字幕检测
-> - InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
+**3. 字幕边缘有一圈白边/残影**
 
-- 使用STTN算法
+框小了几个像素。字幕通常有描边和阴影，上下各留 5–10px 余量。
 
-```python
-MODE = InpaintMode.STTN  # 设置为STTN算法
-# 相邻帧数, 调大会增加显存占用，效果变好
-STTN_NEIGHBOR_STRIDE = 10
-# 参考帧长度, 调大会增加显存占用，效果变好
-STTN_REFERENCE_LENGTH = 10
-# 设置STTN算法最大同时处理的帧数量，设置越大速度越慢，但效果越好
-# 要保证STTN_MAX_LOAD_NUM大于STTN_NEIGHBOR_STRIDE和STTN_REFERENCE_LENGTH
-STTN_MAX_LOAD_NUM = 30
+**4. 网页打不开 / 任务一直排队**
+
+- 确认 `VSR_PYTHON` 指向装了 torch 的 venv：`curl localhost:8800/api/health`
+- 看日志：`journalctl -u vsr-web -f`
+- 云服务器记得在安全组放行端口
+
+**5. 想清掉抖音水印**
+
+用 `sttn-auto`，把水印所在的整个矩形（logo + 抖音号 + 昵称）一起框进去——
+logo 是图形，OCR 认不出来，只有整框重绘能清掉。
+
+---
+
+## 八、目录结构
+
 ```
-- 使用LAMA算法
-```python
-MODE = InpaintMode.LAMA  # 设置为STTN算法
-LAMA_SUPER_FAST = False  # 保证效果
+backend/
+  config.py            # 配置入口：按环境在 Qt 版 / 无界面版之间切换
+  config_qt.py         # 上游实现（需要 PySide6）
+  config_headless.py   # 纯 Python 实现（服务器用，支持 VSR_* 环境变量覆盖）
+  main.py              # 算法主流程（未改动）
+web/
+  app.py               # FastAPI：上传、队列、进度、下载、GPU 状态
+  serve.py             # 多端口启动器
+  static/index.html    # 单页前端（无构建步骤，原生 JS）
+deploy/
+  install.sh           # 参考部署脚本
+  vsr-web.service      # systemd 单元模板
+requirements-web.txt      # Web 服务依赖（3 个包）
+requirements-headless.txt # 服务器算法依赖（不含 GUI 包）
 ```
 
-> 如果对模型去字幕的效果不满意，可以查看design文件夹里面的训练方法，利用backend/tools/train里面的代码进行训练，然后将训练的模型替换旧模型即可
+---
 
-3. 7z文件解压错误
+## 九、致谢与许可
 
-解决方案：升级7-zip解压程序到最新版本
-
-4. Mac版本运行报错：Error "bad CPU type in executable"
-
-解决方案：打开控制台输入`softwareupdate --install-rosetta` 安装rosetta
-
-
-## 赞助
-
-<img src="https://github.com/YaoFANGUK/video-subtitle-extractor/raw/main/design/sponsor.png" width="600">
+- 算法与原始实现：[YaoFANGUK/video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover)（Apache-2.0）
+- 模型：STTN、LaMa、ProPainter、PaddleOCR
+- 本分支的改动同样遵循 Apache-2.0，详见 [LICENSE](LICENSE)

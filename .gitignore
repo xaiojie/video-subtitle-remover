@@ -375,3 +375,9 @@ test*_no_sub*.mp4
 /backend/tools/train/release_model/
 inference.onnx
 /config/config.json
+
+### video-subtitle-remover (Web 版) ###
+config/config.json
+vsr-data/
+.venv/
+.venv-web/
