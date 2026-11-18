@@ -8,6 +8,10 @@
 
 import sys
 import os
+
+# GUI 必须使用 Qt 版配置（backend/config.py 会据此选择实现）
+os.environ.setdefault("VSR_CONFIG_MODE", "qt")
+
 import configparser
 import cv2
 import multiprocessing
